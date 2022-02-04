@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html>
+  <head>
+ <title>Rolling Ball</title>
+    <style>
+      html, body { margin: 0; padding: 0; overflow: hidden; }
+    </style>
+  </head>
+  <body>
+    <script src="three.js/build/three.min.js"></script>
+    <script src="three.js/examples/js/controls/OrbitControls.js"></script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js'></script>
+
+    <script>
+        function getScene(){
+          const scene = new THREE.Scene();
+          scene.background = new THREE.Color('#606060' );
+          return scene;
+        }
+
+        function getLight(scene) {
+          const ambientlight = new THREE.AmbientLight( 0x6688cc );
+          scene.add( ambientlight );
+
+          const fillLight1 = new THREE.DirectionalLight( 0xff9999, 0.5 );
+          fillLight1.position.set( - 1, 1, 2 );
+          scene.add( fillLight1 );
+
+          const fillLight2 = new THREE.DirectionalLight( 0x8888ff, 0.2 );
+          fillLight2.position.set( 0, - 1, 0 );
+          scene.add( fillLight2 );
+
+          const directionalLight = new THREE.DirectionalLight( 0xffffaa, 1.2 );
+          directionalLight.position.set( - 5, 25, - 1 );
+          directionalLight.castShadow = true;
+          directionalLight.shadow.camera.near = 0.01;
+          directionalLight.shadow.camera.far = 500;
+          directionalLight.shadow.camera.right = 30;
+          directionalLight.shadow.camera.left = - 30;
+          directionalLight.shadow.camera.top	= 30;
+          directionalLight.shadow.camera.bottom = - 30;
+          directionalLight.shadow.mapSize.width = 1024;
+          directionalLight.shadow.mapSize.height = 1024;
+          directionalLight.shadow.radius = 4;
+          directionalLight.shadow.bias = - 0.00006;
+          scene.add( directionalLight );
+
+          return directionalLight;
+        }
+
+        function getRenderer() {
+          var renderer = new THREE.WebGLRenderer();
+          renderer.setSize( window.innerWidth, window.innerHeight );
+          document.body.appendChild( renderer.domElement );
+          return renderer;
+        }
+
+        /**
+        * Generate some physics!
+        **/
+
+        function getPhysics() {
+          world = new CANNON.World();
+          world.gravity.set(0, -100, 0); // earth = -9.82 m/s
+          world.broadphase = new CANNON.NaiveBroadphase();
+          world.broadphase.useBoundingBoxes = true;
+          var solver = new CANNON.GSSolver();
+          solver.iterations = 7;
+          solver.tolerance = 0.1;
+          world.solver = solver;
+          world.quatNormalizeSkip = 0;
+          world.quatNormalizeFast = false;
+          world.defaultContactMaterial.contactEquationStiffness = 1e9;
+          world.defaultContactMaterial.contactEquationRelaxation = 4;
+          return world;
+        }
+
+
+        /**
+        * Define contact material for interactions
+        **/
+
+        function getPhysicsMaterial() {
+          var physicsMaterial = new CANNON.Material('slipperyMaterial');
+          var physicsContactMaterial = new CANNON.ContactMaterial(
+              physicsMaterial, physicsMaterial, 0.0, 0.3)
+          world.addContactMaterial(physicsContactMaterial);
+          return physicsMaterial;
+        }
+
+
+        function getCamera(){
+          camera = new THREE.PerspectiveCamera(100, window.innerWidth / window.innerHeight, 1, 1000);
+          camera.position.set( 0, 550, 100);
+          return camera;
+        }
+
+
+        function getControls(camera, renderer) {
+          controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+          controls.enablePan = true;
+          controls.enableZoom = true;
+          controls.enableRotate = true;
+
+          return(controls);
+        }
+
+        /**
+        * Get floor
+        **/
+
+        function getFloor() {
+          var geometry = new THREE.PlaneGeometry(500, 500);
+          var material = new THREE.MeshBasicMaterial();
+          var plane = new THREE.Mesh(geometry, material);
+          plane.rotation.x = Math.PI / 2;
+          scene.add(plane);
+          return plane;
+        }
+
+        function getPlane(geomx, geomz, posy, posz, rotx) {
+          let geometry = new THREE.PlaneGeometry(geomx, geomz);
+          let material = new THREE.MeshBasicMaterial({
+            color: '#ffffe0', side: THREE.DoubleSide });
+          material.color.r *= Math.random();
+          material.color.g *= Math.random();
+          material.color.b *= Math.random();
+          let plane = new THREE.Mesh(geometry, material);
+          plane.position.y = posy;
+          plane.position.z = posz
+          plane.rotation.x =  rotx;
+          scene.add(plane);
+          return plane;
+        }
+
+
+        /**
+        * Vocalulaire :
+        * # = Tuile plate
+        * v = vide
+        * / = tuile montante 45°
+        * \ = tuile desc 45°
+        **/
+        function CreateLevel(str){
+
+          const TileSize=500;
+          const Height = 150
+
+          let InclplaneInit = getPlane(3*TileSize, TileSize, Height+50, 0, 2*Math.PI/6);
+          addPlanePhysics(InclplaneInit);
+          let planeInit = getPlane(3*TileSize, TileSize, Height, 0, Math.PI/2);
+          addPlanePhysics(planeInit);
+
+          console.log(str)
+          let rang = 0;
+          for (let i=0; i< str.length;i++){ 
+            //for(let j=0; j<3;j++){
+                let char = str.charAt(i/*+j*/);
+                if (char == ' '){
+
+                }
+                else if (char == '#'){
+                  rang += 1;
+                  console.log("addtuile")
+                  console.log(rang)
+                  let plane = getPlane(TileSize, TileSize, Height, -rang*500, Math.PI/2)
+                  addPlanePhysics(plane);
+                }
+            //}
+          }
+
+        }
+
+        /**
+        * Add sphere
+        **/
+
+        function addSphere() {
+          var colors = ['#ffffe0','#ffd59b','#ffa474','#f47461',
+              '#db4551','#b81b34','#8b0000'];
+          let size = 20;
+          var geometry = new THREE.SphereGeometry( size, 20, 10);
+          var material = new THREE.MeshPhongMaterial({
+            color: '#0080ff',
+            emissive: 0xaa0000,
+            side: THREE.DoubleSide,
+            flatShading: true
+          });
+          var sphere = new THREE.Mesh(geometry, material);
+          
+          sphere.position.y = 500
+          scene.add(sphere);
+          sphere.userData.radius = size;
+          
+          return sphere;
+        }
+
+        /**
+        * Add object physics
+        **/
+
+        function addFloorPhysics() {
+          var q = floor.quaternion;
+          var floorBody = new CANNON.Body({
+            mass: 0, // mass = 0 makes the body static
+            material: physicsMaterial,
+            shape: new CANNON.Plane(),
+            quaternion: new CANNON.Quaternion(-q._x, q._y, q._z, q._w)
+          });      
+          world.addBody(floorBody);
+        }
+
+        function addPlanePhysics(plane) {
+          var q = plane.quaternion;
+          var p = plane.position;
+          var v = plane.geometry.vertices;
+          var planeBody = new CANNON.Body({
+            mass: 0, // mass = 0 makes the body static
+            material: physicsMaterial,
+            shape: new CANNON.Box(new CANNON.Vec3(250, 250, 1)),
+            quaternion: new CANNON.Quaternion(q._x, q._y, q._z, q._w),
+            position: new CANNON.Vec3(p.x, p.y, p.z)
+          });  
+          world.addBody(planeBody);
+        }
+
+        function addSpherePhysics() {
+          var q = sphere.quaternion;
+          var p = sphere.position;
+          var sphereBody = new CANNON.Body({
+            mass: 100,
+            material: physicsMaterial,
+            shape: new CANNON.Sphere(sphere.userData.radius),
+            linearDamping: 0.0,
+            quaternion: new CANNON.Quaternion(q._x, q._y, q._z, q._w),
+            position: new CANNON.Vec3(p.x, p.y, p.z),
+          });
+          world.addBody(sphereBody);
+          
+          return sphereBody;
+        }
+
+
+        /**
+        * Add event listeners
+        **/
+
+        function addEventListeners() {
+          window.addEventListener('keydown', moveSphere, false);
+          window.addEventListener('resize', function(e) {
+            windowHalfX = window.innerWidth / 2;
+            windowHalfY = window.innerHeight / 2;
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+          })
+        }
+
+        function addGrid() {
+          var size = 100000;
+          var divisions = 1000;
+          var gridHelper = new THREE.GridHelper(size, divisions);
+          scene.add(gridHelper);
+        }
+
+        /*
+        * Moves
+        */
+        function moveSphere(evt){
+      
+          switch( evt.key ) {
+          
+            case 'z':
+              sphereBody.velocity.z += -5;
+              break;
+            
+            case 's':
+            sphereBody.velocity.z += 5;
+              break;
+              
+            case 'q':
+            sphereBody.velocity.x += -5;
+              break;
+              
+            case 'd':
+            sphereBody.velocity.x += 5;
+              break;
+
+            
+          }
+        }
+
+        function updateCameraPos(){
+          camera.position.x = sphere.position.x;
+          camera.position.y = sphere.position.y+50;
+          camera.position.z = sphere.position.z+100;
+        }
+        
+        /**
+        * Render
+        **/
+
+        function render() {
+          requestAnimationFrame(render);
+          renderer.render(scene, camera);
+          updatePhysics();
+          //updateCameraPos();
+          //controls.target.copy( sphere.position );
+          controls.update();
+        };
+
+        function updatePhysics() {
+          world.step(1/60);
+          sphere.position.copy(sphereBody.position);
+          sphere.quaternion.copy(sphereBody.quaternion);
+        }
+
+        var scene = getScene();
+        var camera = getCamera();
+        var light = getLight(scene);
+        var renderer = getRenderer();
+        var world = getPhysics();
+        var physicsMaterial = getPhysicsMaterial();
+        var controls = getControls(camera, renderer);
+
+        // add objects
+        var floor = getFloor();
+        var sphere = addSphere();
+
+        addGrid();
+        addFloorPhysics();
+        let sphereBody = addSpherePhysics();
+
+        let level = `
+                    ###
+                    `
+
+        CreateLevel(level);
+
+        addEventListeners();
+        render();
+
+        
+    </script>
+  </body>
+</html>
+
