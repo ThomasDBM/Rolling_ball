@@ -7,6 +7,7 @@
     </style>
   </head>
   <body>
+    <INPUT TYPE="button" Value="Play in AR" onclick="window.location='./CreateLevel';">
     <script src="three.js/build/three.min.js"></script>
     <script src="three.js/examples/js/controls/OrbitControls.js"></script>
     <script src='https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js'></script>
@@ -156,9 +157,9 @@
 
           const Height = 150
 
-          let InclplaneInit = getPlane(3*TileSize, TileSize, Height+50, 0, 0, 2*Math.PI/6);
+          let InclplaneInit = getPlane(TileSize, TileSize, Height+50, 0, 0, 2*Math.PI/6);
           addPlanePhysics(InclplaneInit);
-          let planeInit = getPlane(3*TileSize, TileSize, Height, 0, 0, Math.PI/2);
+          let planeInit = getPlane(TileSize, TileSize, Height, 0, 0, Math.PI/2);
           addPlanePhysics(planeInit);
 
           console.log(str)
@@ -302,7 +303,7 @@
           var planeBody = new CANNON.Body({
             mass: 0, // mass = 0 makes the body static
             material: physicsMaterial,
-            shape: new CANNON.Box(new CANNON.Vec3(250, 250, 1)),
+            shape: new CANNON.Box(new CANNON.Vec3(TileSize/2, TileSize/2, 1)),
             quaternion: new CANNON.Quaternion(q._x, q._y, q._z, q._w),
             position: new CANNON.Vec3(p.x, p.y, p.z)
           });  
@@ -389,10 +390,10 @@
           requestAnimationFrame(render);
           renderer.render(scene, camera);
           updatePhysics();
-          //updateCameraPos();
-          //controls.target.copy( sphere.position );
+          updateCameraPos();
+          controls.target.copy( sphere.position );
           controls.update();
-          IsArrived()
+          //IsArrived()
         };
 
         function updatePhysics() {
@@ -418,11 +419,12 @@
         let sphereBody = addSpherePhysics();
 
         let level = `
-                    ###
-                    ###
-                    ###
-                    v##
+                    #/#
+                    #/#
                     v#v
+                    v/v
+                    vv/
+                    ##d
                     #A#
                     `;
         let sphereArr;
